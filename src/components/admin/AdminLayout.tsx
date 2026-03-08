@@ -16,7 +16,7 @@ const AdminLayout = () => {
     );
   }
 
-  if (!user) return <Navigate to="/admiiica/login" replace />;
+  if (!user) return <Navigate to="/admin/login" replace />;
   if (!isAdmin && !isWorker) return <Navigate to="/" replace />;
 
   return (
