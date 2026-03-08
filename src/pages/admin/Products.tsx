@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Search, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, Upload, Image as ImageIcon } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -53,6 +53,14 @@ const Products = () => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyProduct);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [hoverImageFile, setHoverImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [hoverImagePreview, setHoverImagePreview] = useState<string | null>(null);
+  
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const hoverImageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
@@ -68,6 +76,10 @@ const Products = () => {
   const openCreate = () => {
     setForm(emptyProduct);
     setEditingId(null);
+    setImageFile(null);
+    setHoverImageFile(null);
+    setImagePreview(null);
+    setHoverImagePreview(null);
     setModalOpen(true);
   };
 
@@ -90,29 +102,72 @@ const Products = () => {
       is_bestseller: p.is_bestseller ?? false,
     });
     setEditingId(p.id);
+    setImageFile(null);
+    setHoverImageFile(null);
+    setImagePreview(p.image);
+    setHoverImagePreview(p.hover_image || null);
     setModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.image || !form.color || !form.price) {
+    if (!form.name || (!form.image && !imagePreview) || !form.color || !form.price) {
       toast.error('Please fill in all required fields (name, image, color, price)');
       return;
     }
 
     setSaving(true);
-    const slug = form.slug || generateSlug(form.name || '');
-    const payload = { ...form, slug } as TablesInsert<'products'>;
+    try {
+      // Use the Base64 preview if a new file was selected, otherwise use the existing URL/string
+      const imageUrl = imagePreview || form.image;
+      const hoverImageUrl = hoverImagePreview || form.hover_image;
 
-    if (editingId) {
-      const { error } = await supabase.from('products').update(payload).eq('id', editingId);
-      if (error) toast.error('Failed to update: ' + error.message);
-      else { toast.success('Product updated!'); setModalOpen(false); fetchProducts(); }
-    } else {
-      const { error } = await supabase.from('products').insert(payload);
-      if (error) toast.error('Failed to create: ' + error.message);
-      else { toast.success('Product created!'); setModalOpen(false); fetchProducts(); }
+      const slug = form.slug || generateSlug(form.name || '');
+      const payload = { 
+        ...form, 
+        slug, 
+        image: imageUrl, 
+        hover_image: hoverImageUrl 
+      } as TablesInsert<'products'>;
+
+      if (editingId) {
+        const { error } = await supabase.from('products').update(payload).eq('id', editingId);
+        if (error) throw error;
+        toast.success('Product updated!');
+      } else {
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) throw error;
+        toast.success('Product created!');
+      }
+      
+      setModalOpen(false);
+      fetchProducts();
+    } catch (error: any) {
+      toast.error('Operation failed: ' + error.message);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'main' | 'hover') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File is too large. Max 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (type === 'main') {
+        setImageFile(file);
+        setImagePreview(reader.result as string);
+      } else {
+        setHoverImageFile(file);
+        setHoverImagePreview(reader.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async () => {
@@ -284,12 +339,101 @@ const Products = () => {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label className="text-xs tracking-wider uppercase font-medium">Image URL *</Label>
-              <Input value={form.image || ''} onChange={e => setField('image', e.target.value)} placeholder="https://example.com/image.jpg" />
+              <Label className="text-xs tracking-wider uppercase font-medium">Main Image *</Label>
+              <div className="flex flex-col gap-3">
+                {imagePreview && (
+                  <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border bg-muted">
+                    <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
+                    <button 
+                      onClick={() => { setImageFile(null); setImagePreview(null); setField('image', ''); }}
+                      className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={e => handleFileChange(e, 'main')}
+                    className="hidden" 
+                    ref={imageInputRef}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full flex items-center gap-2 border-dashed h-20"
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    <Upload size={16} />
+                    <span>{imagePreview ? 'Change Image' : 'Upload Main Image'}</span>
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or URL</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <Input 
+                  value={form.image || ''} 
+                  onChange={e => {
+                    setField('image', e.target.value);
+                    setImagePreview(e.target.value);
+                    setImageFile(null);
+                  }} 
+                  placeholder="https://example.com/image.jpg" 
+                />
+              </div>
             </div>
+
             <div className="space-y-2 md:col-span-2">
-              <Label className="text-xs tracking-wider uppercase font-medium">Hover Image URL</Label>
-              <Input value={form.hover_image || ''} onChange={e => setField('hover_image', e.target.value)} placeholder="https://example.com/hover.jpg" />
+              <Label className="text-xs tracking-wider uppercase font-medium">Hover Image</Label>
+              <div className="flex flex-col gap-3">
+                {hoverImagePreview && (
+                  <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border bg-muted">
+                    <img src={hoverImagePreview} className="w-full h-full object-cover" alt="Hover Preview" />
+                    <button 
+                      onClick={() => { setHoverImageFile(null); setHoverImagePreview(null); setField('hover_image', ''); }}
+                      className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={e => handleFileChange(e, 'hover')}
+                    className="hidden" 
+                    ref={hoverImageInputRef}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full flex items-center gap-2 border-dashed h-20"
+                    onClick={() => hoverImageInputRef.current?.click()}
+                  >
+                    <Upload size={16} />
+                    <span>{hoverImagePreview ? 'Change Image' : 'Upload Hover Image'}</span>
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or URL</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <Input 
+                  value={form.hover_image || ''} 
+                  onChange={e => {
+                    setField('hover_image', e.target.value);
+                    setHoverImagePreview(e.target.value);
+                    setHoverImageFile(null);
+                  }} 
+                  placeholder="https://example.com/hover.jpg" 
+                />
+              </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">

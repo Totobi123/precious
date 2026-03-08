@@ -53,6 +53,16 @@ serve(async (req) => {
       }, { onConflict: 'user_id,role' });
     }
 
+    // Ensure storage bucket exists
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+    if (!buckets?.find(b => b.id === 'products')) {
+      await supabaseAdmin.storage.createBucket('products', {
+        public: true,
+        allowedMimeTypes: ['image/*'],
+      });
+      console.log('Created "products" bucket');
+    }
+
     return new Response(JSON.stringify({ success: true, userId: user?.user?.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
