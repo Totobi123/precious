@@ -1,0 +1,78 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { CartProvider } from "@/contexts/CartContext";
+import { AuthProvider } from "@/hooks/useAuth";
+import Layout from "@/components/layout/Layout";
+import AdminLayout from "@/components/admin/AdminLayout";
+import Index from "./pages/Index";
+import Collections from "./pages/Collections";
+import ProductDetail from "./pages/ProductDetail";
+import About from "./pages/About";
+import SizingGuide from "./pages/SizingGuide";
+import ShippingReturns from "./pages/ShippingReturns";
+import FAQ from "./pages/FAQ";
+import Contact from "./pages/Contact";
+import GiftSets from "./pages/GiftSets";
+import Login from "./pages/Login";
+import Auth from "./pages/Auth";
+import Dashboard from "./pages/admin/Dashboard";
+import Orders from "./pages/admin/Orders";
+import Products from "./pages/admin/Products";
+import UsersManagement from "./pages/admin/UsersManagement";
+import StaffManagement from "./pages/admin/StaffManagement";
+import SiteSettings from "./pages/admin/SiteSettings";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const StorefrontLayout = ({ children }: { children: React.ReactNode }) => (
+  <Layout>{children}</Layout>
+);
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+        <CartProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Storefront */}
+              <Route path="/" element={<StorefrontLayout><Index /></StorefrontLayout>} />
+              <Route path="/collections/all" element={<StorefrontLayout><Collections /></StorefrontLayout>} />
+              <Route path="/product/:id" element={<StorefrontLayout><ProductDetail /></StorefrontLayout>} />
+              <Route path="/about" element={<StorefrontLayout><About /></StorefrontLayout>} />
+              <Route path="/sizing-guide" element={<StorefrontLayout><SizingGuide /></StorefrontLayout>} />
+              <Route path="/shipping-returns" element={<StorefrontLayout><ShippingReturns /></StorefrontLayout>} />
+              <Route path="/faq" element={<StorefrontLayout><FAQ /></StorefrontLayout>} />
+              <Route path="/contact" element={<StorefrontLayout><Contact /></StorefrontLayout>} />
+              <Route path="/gift-sets" element={<StorefrontLayout><GiftSets /></StorefrontLayout>} />
+
+              {/* Auth */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/auth" element={<Auth />} />
+
+              {/* Admin */}
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="orders" element={<Orders />} />
+                <Route path="products" element={<Products />} />
+                <Route path="users" element={<UsersManagement />} />
+                <Route path="staff" element={<StaffManagement />} />
+                <Route path="settings" element={<SiteSettings />} />
+              </Route>
+
+              <Route path="*" element={<StorefrontLayout><NotFound /></StorefrontLayout>} />
+            </Routes>
+          </BrowserRouter>
+        </CartProvider>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;

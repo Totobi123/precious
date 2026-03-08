@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 20% 97%;
+    --foreground: 340 10% 20%;
+
+    --card: 30 20% 95%;
+    --card-foreground: 340 10% 20%;
+
+    --popover: 30 20% 97%;
+    --popover-foreground: 340 10% 20%;
+
+    --primary: 340 20% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 30 25% 93%;
+    --secondary-foreground: 340 10% 20%;
+
+    --muted: 30 15% 92%;
+    --muted-foreground: 340 5% 45%;
+
+    --accent: 340 15% 88%;
+    --accent-foreground: 340 10% 20%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
+    --ring: 340 20% 55%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 30 20% 96%;
+    --sidebar-foreground: 340 10% 20%;
+    --sidebar-primary: 340 20% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 30 25% 93%;
+    --sidebar-accent-foreground: 340 10% 20%;
+    --sidebar-border: 30 15% 88%;
+    --sidebar-ring: 340 20% 55%;
+
+    --pc-blush: 340 30% 90%;
+    --pc-mauve: 330 20% 80%;
+    --pc-cream: 30 30% 95%;
+    --pc-warm: 20 25% 90%;
+  }
+
+  .dark {
+    --background: 0 0% 3%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 3%;
+
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 85%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Raleway', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .heading-display {
+    font-family: 'Playfair Display', serif;
+    @apply font-medium tracking-wide;
+  }
+
+  .text-body {
+    font-family: 'Raleway', sans-serif;
+    @apply font-light tracking-wider text-sm;
+  }
+
+  .btn-luxury {
+    @apply bg-primary text-primary-foreground px-8 py-3 text-xs tracking-[0.2em] uppercase font-medium transition-all duration-300 hover:opacity-80 rounded-full;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 3px;
+}
+
+/* Ticker animation */
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+}
