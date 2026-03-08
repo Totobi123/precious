@@ -12,12 +12,12 @@ const AdminSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
 
   const adminLinks = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/admin/orders', icon: ShoppingBag, label: 'Orders' },
-    { to: '/admin/products', icon: Package, label: 'Products' },
-    { to: '/admin/users', icon: Users, label: 'Users', adminOnly: true },
-    { to: '/admin/staff', icon: UserCog, label: 'Staff Management', adminOnly: true },
-    { to: '/admin/settings', icon: Settings, label: 'Site Settings', adminOnly: true },
+    { to: '/admiiica', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/admiiica/orders', icon: ShoppingBag, label: 'Orders' },
+    { to: '/admiiica/products', icon: Package, label: 'Products' },
+    { to: '/admiiica/users', icon: Users, label: 'Users', adminOnly: true },
+    { to: '/admiiica/staff', icon: UserCog, label: 'Staff Management', adminOnly: true },
+    { to: '/admiiica/settings', icon: Settings, label: 'Site Settings', adminOnly: true },
   ];
 
   const visibleLinks = adminLinks.filter(link => {
