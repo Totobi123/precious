@@ -53,11 +53,11 @@ const App = () => (
               <Route path="/gift-sets" element={<StorefrontLayout><GiftSets /></StorefrontLayout>} />
 
               {/* Auth */}
-              <Route path="/login" element={<Login />} />
+              <Route path="/admiiica/login" element={<Login />} />
               <Route path="/auth" element={<Auth />} />
 
               {/* Admin */}
-              <Route path="/admin" element={<AdminLayout />}>
+              <Route path="/admiiica" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="products" element={<Products />} />
