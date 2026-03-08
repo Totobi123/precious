@@ -53,7 +53,7 @@ const App = () => (
               <Route path="/gift-sets" element={<StorefrontLayout><GiftSets /></StorefrontLayout>} />
 
               {/* Auth */}
-              <Route path="/login" element={<Login />} />
+              <Route path="/admiiica/login" element={<Login />} />
               <Route path="/auth" element={<Auth />} />
 
               {/* Admin */}
