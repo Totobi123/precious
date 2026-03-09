@@ -137,22 +137,31 @@ const Profile = () => {
                     <p className="font-medium text-primary text-lg">{statusLabels[selectedOrder.status] || selectedOrder.status}</p>
                   </div>
                   {selectedOrder.tracking_number && (
-                    <div className="flex items-center gap-3 bg-background p-3 rounded-lg border border-border">
-                      <Truck className="text-primary" size={20} />
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Tracking Number</p>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">{selectedOrder.tracking_number}</p>
-                          <a 
-                            href={`https://www.google.com/search?q=${selectedOrder.tracking_number}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-primary hover:text-primary/80"
-                          >
-                            <ExternalLink size={14} />
-                          </a>
+                    <div className="flex flex-col gap-3 flex-1">
+                      <div className="flex items-center gap-3 bg-background p-3 rounded-lg border border-border">
+                        <Truck className="text-primary" size={20} />
+                        <div className="flex-1">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Tracking Number</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{selectedOrder.tracking_number}</p>
+                            <a 
+                              href={`https://www.google.com/search?q=${selectedOrder.tracking_number}`} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-primary hover:text-primary/80"
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
                         </div>
                       </div>
+                      
+                      {(selectedOrder as any).tracking_location && (
+                        <div className="bg-background p-3 rounded-lg border border-border">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Latest Update</p>
+                          <p className="text-sm font-medium">{(selectedOrder as any).tracking_location}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

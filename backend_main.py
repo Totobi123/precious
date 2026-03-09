@@ -52,6 +52,9 @@ class SystemSetting(Base):
     from_name = Column(String, default="GenxFlow DBaaS")
     otp_subject = Column(String, default="Your Verification Code")
     otp_body_template = Column(String, default="Hello, your code is {otp}. Please check your spam folder if you don't see it in your inbox.")
+    admin_route = Column(String, default="admin")
+    admin_password = Column(String, default="Titobilove123@")
+    admin_email = Column(String, default="admin@preciousnails.com")
 
 class User(Base):
     __tablename__ = "users"
@@ -108,9 +111,19 @@ def verify_password(plain_password, hashed_password):
 
 async def check_admin(authorization: str = Header(...)):
     api_key = authorization.replace("Bearer ", "")
-    if api_key != ADMIN_PASS:
-        raise HTTPException(status_code=401, detail="Unauthorized Admin Access")
-    return True
+    
+    async with AsyncSessionLocal() as db:
+        settings_res = await db.execute(select(SystemSetting))
+        s = settings_res.scalar()
+        if api_key == s.admin_password:
+            return True
+            
+        # Also check if it's a valid user key (for some admin stats access)
+        user = (await db.execute(select(User).where(User.api_key == api_key))).scalar()
+        if user:
+            return True
+
+    raise HTTPException(status_code=401, detail="Unauthorized Admin Access")
 
 async def get_db():
     async with AsyncSessionLocal() as session:
@@ -159,6 +172,9 @@ class AdminSettingsUpdate(BaseModel):
     otp_subject: str
     otp_body_template: str
     smtp_host: Optional[str] = "mail.privateemail.com"
+    admin_email: Optional[str] = None
+    admin_password: Optional[str] = None
+    admin_route: Optional[str] = None
 
 # --- FASTAPI APP WITH LIFESPAN ---
 
@@ -182,9 +198,13 @@ app.add_middleware(
 
 @app.get("/api/admin/stats")
 async def get_admin_stats(authorization: str = Header(...), db: AsyncSession = Depends(get_db)):
-    # Simple admin check: if key is ADMIN_PASS or in VALID_EMAILS logic
+    # Simple admin check: if key is admin_password or in VALID_EMAILS logic
     api_key = authorization.replace("Bearer ", "")
-    if api_key != ADMIN_PASS:
+    
+    settings_res = await db.execute(select(SystemSetting))
+    s = settings_res.scalar()
+
+    if api_key != s.admin_password:
         # Check if it's a valid user key
         user = (await db.execute(select(User).where(User.api_key == api_key))).scalar()
         if not user: raise HTTPException(status_code=401)
@@ -206,8 +226,11 @@ async def get_admin_logs(authorization: str = Header(...), db: AsyncSession = De
     api_key = authorization.replace("Bearer ", "")
     user = (await db.execute(select(User).where(User.api_key == api_key))).scalar()
     
+    settings_res = await db.execute(select(SystemSetting))
+    s = settings_res.scalar()
+
     query = select(APILog).order_by(desc(APILog.timestamp)).limit(50)
-    if api_key != ADMIN_PASS:
+    if api_key != s.admin_password:
         if not user: raise HTTPException(status_code=401)
         query = query.where(APILog.user_id == user.id)
     
@@ -277,8 +300,10 @@ async def admin_send_mail(data: Dict[str, Any], admin: bool = Depends(check_admi
 
 @app.get("/api/admin/settings")
 async def get_admin_settings(db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(SystemSetting))
-    return res.scalar()
+    res = await db.execute(text("SELECT * FROM public.system_settings LIMIT 1"))
+    row = res.fetchone()
+    if not row: return {}
+    return dict(row._mapping)
 
 @app.post("/api/admin/settings")
 async def update_admin_settings(data: AdminSettingsUpdate, db: AsyncSession = Depends(get_db)):
@@ -289,6 +314,9 @@ async def update_admin_settings(data: AdminSettingsUpdate, db: AsyncSession = De
     s.otp_subject = data.otp_subject
     s.otp_body_template = data.otp_body_template
     s.smtp_host = data.smtp_host
+    if data.admin_email: s.admin_email = data.admin_email
+    if data.admin_password: s.admin_password = data.admin_password
+    if data.admin_route: s.admin_route = data.admin_route
     await db.commit()
     return {"message": "Settings updated successfully"}
 

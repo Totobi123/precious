@@ -1,60 +1,85 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/integrations/superbase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Save, Lock, Shield } from 'lucide-react';
+import { Save, Lock, Shield, Mail } from 'lucide-react';
 
 const SiteSettings = () => {
   const [announcementText, setAnnouncementText] = useState('');
   const [announcementEnabled, setAnnouncementEnabled] = useState(true);
   const [adminRoute, setAdminRoute] = useState('admin');
+  const [adminEmail, setAdminEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpHost, setSmtpHost] = useState('');
+  const [fromName, setFromName] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase.from('site_settings').select('*');
-      if (data) {
-        const textSetting = data.find(s => s.key === 'announcement_bar_text');
-        const enabledSetting = data.find(s => s.key === 'announcement_bar_enabled');
-        const routeSetting = data.find(s => s.key === 'admin_route_path');
-        if (textSetting) setAnnouncementText(textSetting.value || '');
-        if (enabledSetting) setAnnouncementEnabled(enabledSetting.value === 'true');
-        if (routeSetting) setAdminRoute(routeSetting.value || 'admin');
+    const fetchSettings = async () => {
+      try {
+        const data = await api.admin.getSettings();
+        if (data) {
+          setSmtpUser(data.active_smtp_user || '');
+          setSmtpPass(data.smtp_password || '');
+          setSmtpHost(data.smtp_host || '');
+          setFromName(data.from_name || '');
+          setAdminRoute(data.admin_route || 'admin');
+          setAdminEmail(data.admin_email || '');
+          setAnnouncementText(data.otp_subject || ''); // Using existing field as placeholder for now
+        }
+      } catch (err) {
+        console.error('Fetch settings failed:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetch();
+    fetchSettings();
   }, []);
 
   const save = async () => {
     setSaving(true);
     try {
-      const updates = [
-        supabase.from('site_settings').upsert({ key: 'announcement_bar_text', value: announcementText }, { onConflict: 'key' }),
-        supabase.from('site_settings').upsert({ key: 'announcement_bar_enabled', value: announcementEnabled ? 'true' : 'false' }, { onConflict: 'key' }),
-        supabase.from('site_settings').upsert({ key: 'admin_route_path', value: adminRoute }, { onConflict: 'key' }),
-      ];
-      
-      if (newPassword) {
-        if (newPassword !== confirmPassword) {
-          toast.error('Passwords do not match');
-          setSaving(false);
-          return;
-        }
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) throw error;
-        setNewPassword('');
-        setConfirmPassword('');
+      if (newPassword && newPassword !== confirmPassword) {
+        toast.error('Passwords do not match');
+        setSaving(false);
+        return;
       }
 
-      await Promise.all(updates);
+      await api.admin.updateSettings({
+        active_smtp_user: smtpUser,
+        smtp_password: smtpPass,
+        smtp_host: smtpHost,
+        from_name: fromName,
+        admin_route: adminRoute,
+        admin_email: adminEmail,
+        admin_password: newPassword || undefined,
+        otp_subject: announcementText, // Placeholder mapping
+        otp_body_template: "Hello, your code is {otp}." // Placeholder
+      });
+      
+      if (newPassword) {
+        setNewPassword('');
+        setConfirmPassword('');
+        // Update the stored key if it was the admin password
+        if (localStorage.getItem('superbase_api_key') === 'Titobilove123@') {
+            localStorage.setItem('superbase_api_key', newPassword);
+        }
+      }
+
       toast.success('Settings saved!');
+      // If admin route changed, suggest a reload
+      if (adminRoute !== window.location.pathname.split('/')[1]) {
+          toast.info("Admin route changed. You'll need to use the new URL next time.");
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save settings');
     } finally {
@@ -72,22 +97,48 @@ const SiteSettings = () => {
       </div>
 
       <div className="max-w-2xl space-y-8 pb-12">
-        {/* Announcement Bar */}
+        {/* Admin Account */}
         <div className="bg-card rounded-xl border border-border p-6">
-          <h2 className="heading-display text-lg tracking-wider mb-4">Announcement Bar</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <Mail size={18} className="text-primary" />
+            <h2 className="heading-display text-lg tracking-wider">Admin Account</h2>
+          </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs tracking-wider uppercase">Enabled</Label>
-              <Switch checked={announcementEnabled} onCheckedChange={setAnnouncementEnabled} />
+            <div>
+              <Label className="text-xs tracking-wider uppercase">Admin Contact Email</Label>
+              <Input
+                value={adminEmail}
+                onChange={e => setAdminEmail(e.target.value)}
+                className="rounded-xl mt-1"
+                placeholder="admin@preciousnails.com"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Primary email used for store communications.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* SMTP Settings */}
+        <div className="bg-card rounded-xl border border-border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Mail size={18} className="text-primary" />
+            <h2 className="heading-display text-lg tracking-wider">Email (SMTP) Settings</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+                <Label className="text-xs tracking-wider uppercase">Sender Name</Label>
+                <Input value={fromName} onChange={e => setFromName(e.target.value)} className="rounded-xl mt-1" />
             </div>
             <div>
-              <Label className="text-xs tracking-wider uppercase">Announcement Text</Label>
-              <Input
-                value={announcementText}
-                onChange={e => setAnnouncementText(e.target.value)}
-                className="rounded-xl mt-1"
-                placeholder="Your announcement text..."
-              />
+                <Label className="text-xs tracking-wider uppercase">SMTP Host</Label>
+                <Input value={smtpHost} onChange={e => setSmtpHost(e.target.value)} className="rounded-xl mt-1" />
+            </div>
+            <div>
+                <Label className="text-xs tracking-wider uppercase">SMTP User</Label>
+                <Input value={smtpUser} onChange={e => setSmtpUser(e.target.value)} className="rounded-xl mt-1" />
+            </div>
+            <div className="md:col-span-2">
+                <Label className="text-xs tracking-wider uppercase">SMTP Password</Label>
+                <Input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} className="rounded-xl mt-1" />
             </div>
           </div>
         </div>
@@ -119,7 +170,7 @@ const SiteSettings = () => {
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-center gap-2 mb-4">
             <Lock size={18} className="text-primary" />
-            <h2 className="heading-display text-lg tracking-wider">Change Password</h2>
+            <h2 className="heading-display text-lg tracking-wider">Change Admin Password</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -141,18 +192,6 @@ const SiteSettings = () => {
                 className="rounded-xl mt-1"
                 placeholder="••••••••"
               />
-            </div>
-          </div>
-        </div>
-
-        {/* API Keys (placeholder) */}
-        <div className="bg-card rounded-xl border border-border p-6 opacity-60">
-          <h2 className="heading-display text-lg tracking-wider mb-4">API Integrations</h2>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs tracking-wider uppercase">Stripe Secret Key</Label>
-              <Input type="password" placeholder="sk_live_..." className="rounded-xl mt-1" disabled />
-              <p className="text-[11px] text-muted-foreground mt-1">Configure via Cloud → Secrets</p>
             </div>
           </div>
         </div>

@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, Eye, Printer, UserCheck, Mail, MapPin, Package } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Search, Eye, Printer, UserCheck, Mail, MapPin, Package, ExternalLink } from 'lucide-react';
 
 const statusColors: any = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -37,7 +38,11 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingLocation, setTrackingLocation] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = async () => {
@@ -67,6 +72,7 @@ const Orders = () => {
   const handleOpenOrder = (order: any) => {
     setSelectedOrder(order);
     setTrackingNumber(order.tracking_number || '');
+    setTrackingLocation(order.tracking_location || '');
     setInternalNotes(order.internal_notes || '');
     setOrderItems([]);
     fetchOrderItems(order.id);
@@ -99,13 +105,31 @@ const Orders = () => {
     try {
       await api.data.update('orders', selectedOrder.id, {
         tracking_number: trackingNumber || null,
+        tracking_location: trackingLocation || null,
         internal_notes: internalNotes || null,
       });
       toast.success('Order tracking and notes updated!'); 
       fetchOrders(); 
-      setSelectedOrder((prev: any) => prev ? { ...prev, tracking_number: trackingNumber, internal_notes: internalNotes } : null);
+      setSelectedOrder((prev: any) => prev ? { ...prev, tracking_number: trackingNumber, tracking_location: trackingLocation, internal_notes: internalNotes } : null);
     } catch (err) {
       toast.error('Failed to save');
+    }
+  };
+
+  const sendCustomEmail = async () => {
+    if (!selectedOrder) return;
+    try {
+      await api.admin.sendMail({
+        to: selectedOrder.customer_email,
+        subject: emailSubject,
+        body: emailBody
+      });
+      toast.success('Email sent successfully!');
+      setShowEmailDialog(false);
+      setEmailSubject('');
+      setEmailBody('');
+    } catch (err) {
+      toast.error('Failed to send email');
     }
   };
 
@@ -194,13 +218,27 @@ const Orders = () => {
           <DialogHeader>
             <DialogTitle className="heading-display tracking-wider flex items-center justify-between">
               <span>Order {selectedOrder?.order_number}</span>
-              <a 
-                href={`mailto:${selectedOrder?.customer_email}?subject=Regarding your Precious Chic Nails Order ${selectedOrder?.order_number}`}
-                className="text-sm font-sans font-normal text-muted-foreground hover:text-foreground flex items-center gap-2 border px-3 py-1.5 rounded-lg mr-6"
-              >
-                <Mail size={14} />
-                Contact Customer
-              </a>
+              <div className="flex gap-2 mr-6">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEmailSubject(`Update regarding your Precious Chic Nails Order ${selectedOrder?.order_number}`);
+                    setShowEmailDialog(true);
+                  }}
+                  className="text-sm font-sans font-normal text-muted-foreground hover:text-foreground flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                >
+                  <Mail size={14} />
+                  Send Email
+                </Button>
+                <a 
+                  href={`mailto:${selectedOrder?.customer_email}?subject=Regarding your Precious Chic Nails Order ${selectedOrder?.order_number}`}
+                  className="text-sm font-sans font-normal text-muted-foreground hover:text-foreground flex items-center gap-2 border px-3 py-1.5 rounded-lg"
+                >
+                  <Mail size={14} />
+                  Open in Mail App
+                </a>
+              </div>
             </DialogTitle>
           </DialogHeader>
           {selectedOrder && (
@@ -294,6 +332,16 @@ const Orders = () => {
               </div>
 
               <div>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Current Tracking Location</p>
+                <Input
+                  value={trackingLocation}
+                  onChange={e => setTrackingLocation(e.target.value)}
+                  placeholder="e.g. In transit - Los Angeles, CA"
+                  className="rounded-xl"
+                />
+              </div>
+
+              <div>
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Internal Notes</p>
                 <Textarea
                   value={internalNotes}
@@ -309,6 +357,43 @@ const Orders = () => {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Composition Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="heading-display tracking-wider">Send Email to Customer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div>
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">To</Label>
+              <Input value={selectedOrder?.customer_email} disabled className="rounded-xl bg-muted" />
+            </div>
+            <div>
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">Subject</Label>
+              <Input 
+                value={emailSubject} 
+                onChange={e => setEmailSubject(e.target.value)} 
+                placeholder="Compose your subject here..." 
+                className="rounded-xl" 
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 block">Message</Label>
+              <Textarea 
+                value={emailBody} 
+                onChange={e => setEmailBody(e.target.value)} 
+                placeholder="Compose your message here..." 
+                rows={8} 
+                className="rounded-xl" 
+              />
+            </div>
+            <Button onClick={sendCustomEmail} className="w-full btn-luxury">
+              Send Message
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

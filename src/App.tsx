@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/superbase";
 import Layout from "@/components/layout/Layout";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Index from "./pages/Index";
@@ -41,12 +41,12 @@ const App = () => {
 
   useEffect(() => {
     const fetchAdminPath = async () => {
-      const { data } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "admin_route_path")
-        .single();
-      if (data?.value) setAdminPath(data.value);
+      try {
+        const data = await api.admin.getSettings();
+        if (data?.admin_route) setAdminPath(data.admin_route);
+      } catch (err) {
+        console.error("Fetch admin path failed:", err);
+      }
     };
     fetchAdminPath();
   }, []);
