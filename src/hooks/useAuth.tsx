@@ -1,19 +1,18 @@
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { User, Session } from '@supabase/supabase-js';
-import type { Database } from '@/integrations/supabase/types';
+import { api } from '@/integrations/superbase';
 
-type AppRole = Database['public']['Enums']['app_role'];
+interface User {
+  email: string;
+  id?: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  roles: AppRole[];
   isAdmin: boolean;
-  isWorker: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error?: any }>;
+  signUp: (email: string, password: string) => Promise<{ error?: any }>;
+  verifyOtp: (email: string, otp: string) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -21,83 +20,83 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const fetchRoles = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
-    if (data) setRoles(data.map(r => r.role));
+  const checkSession = useCallback(async () => {
+    const apiKey = localStorage.getItem('superbase_api_key');
+    if (!apiKey) {
+      setUser(null);
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // For Superbase, we can try to get the user's profile or just use the API key
+      // If the key exists, we assume logged in for now, or check a 'me' endpoint if exists
+      // Based on docs, we'll store email in localstorage too for UI
+      const savedEmail = localStorage.getItem('user_email');
+      if (savedEmail) {
+        setUser({ email: savedEmail });
+        // Hardcoded admin check based on your provided admin key for now, 
+        // or check if email is admin@gmail.com
+        setIsAdmin(savedEmail === 'admin@gmail.com' || savedEmail === 'admin@preciousnails.com');
+      }
+    } catch (err) {
+      localStorage.removeItem('superbase_api_key');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchRoles(session.user.id);
-      }
-      
-      if (mounted) setLoading(false);
-    };
-
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchRoles(session.user.id);
-        } else {
-          setRoles([]);
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [fetchRoles]);
+    checkSession();
+  }, [checkSession]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const data = await api.auth.login({ email, password });
+      if (data.api_key) {
+        localStorage.setItem('superbase_api_key', data.api_key);
+        localStorage.setItem('user_email', email);
+        setUser({ email });
+        setIsAdmin(email === 'admin@gmail.com' || email === 'admin@preciousnails.com');
+        return {};
+      }
+      return { error: { message: 'Login failed' } };
+    } catch (error: any) {
+      return { error };
+    }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
-    });
-    return { error };
+  const signUp = async (email: string, password: string) => {
+    try {
+      await api.auth.signup({ email, password });
+      return {};
+    } catch (error: any) {
+      return { error };
+    }
+  };
+
+  const verifyOtp = async (email: string, otp: string) => {
+    try {
+      await api.auth.verifyOtp({ email, otp });
+      return {};
+    } catch (error: any) {
+      return { error };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setRoles([]);
+    localStorage.removeItem('superbase_api_key');
+    localStorage.removeItem('user_email');
+    setUser(null);
+    setIsAdmin(false);
   };
 
-  const isAdmin = roles.includes('admin');
-  const isWorker = roles.includes('worker');
-
   return (
-    <AuthContext.Provider value={{ user, session, loading, roles, isAdmin, isWorker, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, signIn, signUp, verifyOtp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

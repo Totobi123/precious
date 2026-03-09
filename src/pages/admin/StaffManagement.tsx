@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/integrations/superbase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,15 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Trash2, UserCog } from 'lucide-react';
 
-interface StaffMember {
-  user_id: string;
-  role: string;
-  email: string | null;
-  full_name: string | null;
-}
-
 const StaffManagement = () => {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -25,28 +18,19 @@ const StaffManagement = () => {
   const [creating, setCreating] = useState(false);
 
   const fetchStaff = async () => {
-    // Get all users with worker or admin roles
-    const { data: roles } = await supabase.from('user_roles').select('user_id, role')
-      .in('role', ['admin', 'worker']);
-    
-    if (!roles) { setLoading(false); return; }
-
-    const userIds = [...new Set(roles.map(r => r.user_id))];
-    const { data: profiles } = await supabase.from('profiles').select('user_id, email, full_name')
-      .in('user_id', userIds);
-
-    const staffList: StaffMember[] = roles.map(r => {
-      const profile = profiles?.find(p => p.user_id === r.user_id);
-      return {
-        user_id: r.user_id,
-        role: r.role,
-        email: profile?.email ?? null,
-        full_name: profile?.full_name ?? null,
-      };
-    });
-
-    setStaff(staffList);
-    setLoading(false);
+    try {
+      const users = await api.admin.getUsers();
+      // In Superbase, we can filter for admin emails or a 'role' field if added to the user record
+      // For now, let's treat admin@preciousnails.com and admin@gmail.com as staff
+      const staffList = users.filter((u: any) => 
+        u.email?.includes('admin') || u.email?.includes('worker')
+      );
+      setStaff(staffList);
+    } catch (err) {
+      console.error('Fetch staff failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchStaff(); }, []);
@@ -58,43 +42,23 @@ const StaffManagement = () => {
     }
     setCreating(true);
 
-    // Sign up the worker (the trigger will create profile + customer role)
-    const { data, error } = await supabase.auth.signUp({
-      email: newEmail.trim(),
-      password: newPassword.trim(),
-      options: { data: { full_name: newName.trim() } },
-    });
-
-    if (error) {
-      toast.error(error.message);
-      setCreating(false);
-      return;
-    }
-
-    if (data.user) {
-      // Add worker role
-      const { error: roleError } = await supabase.from('user_roles').insert({
-        user_id: data.user.id,
-        role: 'worker' as const,
+    try {
+      await api.auth.signup({
+        email: newEmail.trim(),
+        password: newPassword.trim(),
+        full_name: newName.trim()
       });
-      if (roleError) toast.error('User created but failed to assign worker role');
-      else toast.success('Worker added successfully!');
+      toast.success('Worker account created! They need to verify OTP.');
+      setNewEmail('');
+      setNewPassword('');
+      setNewName('');
+      setDialogOpen(false);
+      fetchStaff();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account');
+    } finally {
+      setCreating(false);
     }
-
-    setNewEmail('');
-    setNewPassword('');
-    setNewName('');
-    setDialogOpen(false);
-    setCreating(false);
-    fetchStaff();
-  };
-
-  const removeWorkerRole = async (userId: string) => {
-    const { error } = await supabase.from('user_roles').delete()
-      .eq('user_id', userId)
-      .eq('role', 'worker');
-    if (error) toast.error('Failed to remove role');
-    else { toast.success('Worker role removed'); fetchStaff(); }
   };
 
   return (
@@ -142,12 +106,11 @@ const StaffManagement = () => {
               <th className="text-left text-[11px] tracking-[0.12em] uppercase font-semibold p-4">Name</th>
               <th className="text-left text-[11px] tracking-[0.12em] uppercase font-semibold p-4">Email</th>
               <th className="text-left text-[11px] tracking-[0.12em] uppercase font-semibold p-4">Role</th>
-              <th className="text-right text-[11px] tracking-[0.12em] uppercase font-semibold p-4">Actions</th>
             </tr>
           </thead>
           <tbody>
             {staff.map((s, i) => (
-              <tr key={`${s.user_id}-${s.role}-${i}`} className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
+              <tr key={s.id || s.email} className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors">
                 <td className="p-4">
                   <div className="flex items-center gap-2">
                     <UserCog size={16} className="text-muted-foreground" />
@@ -156,16 +119,9 @@ const StaffManagement = () => {
                 </td>
                 <td className="p-4 text-sm text-muted-foreground">{s.email || 'N/A'}</td>
                 <td className="p-4">
-                  <Badge variant={s.role === 'admin' ? 'default' : 'secondary'} className="text-[10px] tracking-wider uppercase">
-                    {s.role}
+                  <Badge variant={s.email?.includes('admin') ? 'default' : 'secondary'} className="text-[10px] tracking-wider uppercase">
+                    {s.email?.includes('admin') ? 'admin' : 'worker'}
                   </Badge>
-                </td>
-                <td className="p-4 text-right">
-                  {s.role === 'worker' && (
-                    <Button variant="ghost" size="sm" onClick={() => removeWorkerRole(s.user_id)} className="text-destructive hover:text-destructive">
-                      <Trash2 size={14} />
-                    </Button>
-                  )}
                 </td>
               </tr>
             ))}

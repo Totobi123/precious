@@ -33,8 +33,13 @@ const Index = () => {
     <>
       {/* Hero Section */}
       <section className="relative min-h-screen bg-accent">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 items-center min-h-screen gap-8">
-          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }} className="pt-32 md:pt-0">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 items-center min-h-screen gap-8 pb-12 md:pb-0">
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            transition={{ duration: 0.8, delay: 0.2 }} 
+            className="pt-8 md:pt-0 order-2 md:order-1"
+          >
             <h2 className="heading-display text-4xl md:text-5xl lg:text-6xl leading-tight mb-6">
               Elevated Press-On Nails for Effortless Confidence
             </h2>
@@ -46,8 +51,19 @@ const Index = () => {
               <Link to="/collections/all" className="text-xs tracking-[0.15em] uppercase font-medium underline underline-offset-4 hover:opacity-60 transition-opacity">Find Your Size</Link>
             </div>
           </motion.div>
-          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.4 }} className="hidden md:block">
-            <img src="/images/hero-nails.jpg" alt="Precious Chic Nails luxury press-on nails" className="w-full h-[80vh] object-cover rounded-bl-[80px]" />
+          <motion.div 
+            initial={{ opacity: 0, x: 30 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            transition={{ duration: 0.8, delay: 0.4 }} 
+            className="order-1 md:order-2 mt-20 md:mt-0"
+          >
+            <img 
+              src="/images/hero-nails.jpg" 
+              alt="Precious Chic Nails luxury press-on nails" 
+              className="w-full h-[50vh] md:h-[80vh] object-cover rounded-xl md:rounded-bl-[80px]"
+              fetchpriority="high"
+              loading="eager"
+            />
           </motion.div>
         </div>
       </section>

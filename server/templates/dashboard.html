@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superbase | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .gradient-text { background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold gradient-text">Superbase Dashboard</h1>
+                <p class="text-slate-400">Manage your Database-as-a-Service in real-time.</p>
+            </div>
+            <div id="auth-section" class="flex gap-4">
+                <input id="api-key-input" type="password" placeholder="Enter API Key" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="loadDashboard()" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium transition">Connect</button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 hidden">
+            <div class="glass p-6 rounded-2xl">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-blue-500/20 rounded-xl text-blue-400"><i class="fas fa-table text-xl"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-400">Total Tables</p>
+                        <h3 id="stat-tables" class="text-2xl font-bold">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="glass p-6 rounded-2xl">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-purple-500/20 rounded-xl text-purple-400"><i class="fas fa-history text-xl"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-400">API Requests</p>
+                        <h3 id="stat-logs" class="text-2xl font-bold">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="glass p-6 rounded-2xl">
+                <div class="flex items-center gap-4">
+                    <div class="p-3 bg-green-500/20 rounded-xl text-green-400"><i class="fas fa-database text-xl"></i></div>
+                    <div>
+                        <p class="text-sm text-slate-400">Active Schema</p>
+                        <h3 id="stat-schema" class="text-2xl font-bold">None</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="grid grid-cols-1 lg:grid-cols-3 gap-8 hidden">
+            <!-- Logs Table -->
+            <div class="lg:col-span-2 glass rounded-2xl overflow-hidden">
+                <div class="p-6 border-b border-white/10 flex justify-between items-center">
+                    <h2 class="text-xl font-bold">Recent Activity</h2>
+                    <button onclick="refreshLogs()" class="text-slate-400 hover:text-white transition"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Method</th>
+                                <th class="px-6 py-4">Endpoint</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-body" class="divide-y divide-white/5">
+                            <!-- Logs will appear here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quick Info / Actions -->
+            <div class="glass rounded-2xl p-6 h-fit">
+                <h2 class="text-xl font-bold mb-4">Quick Actions</h2>
+                <div class="space-y-4">
+                    <button onclick="window.open('/docs')" class="w-full bg-slate-800 hover:bg-slate-700 p-3 rounded-xl flex items-center gap-3 transition">
+                        <i class="fas fa-book text-blue-400"></i>
+                        <span>API Documentation</span>
+                    </button>
+                    <div class="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-200">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Make sure to use your API Key in the header for all data requests.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Welcome Message -->
+        <div id="welcome-msg" class="text-center py-20">
+            <i class="fas fa-shield-alt text-6xl text-slate-700 mb-6"></i>
+            <h2 class="text-2xl font-bold text-slate-400">Please enter your API Key to access the dashboard.</h2>
+        </div>
+    </div>
+
+    <script>
+        let currentApiKey = '';
+
+        async function loadDashboard() {
+            const key = document.getElementById('api-key-input').value;
+            if (!key) return alert('Please enter your API Key');
+            currentApiKey = key;
+
+            try {
+                const statsRes = await fetch('/api/admin/stats', {
+                    headers: { 'Authorization': `Bearer ${key}` }
+                });
+                if (!statsRes.ok) throw new Error('Invalid Key');
+                const stats = await statsRes.json();
+
+                // Update UI
+                document.getElementById('stat-tables').innerText = stats.tables;
+                document.getElementById('stat-logs').innerText = stats.logs;
+                document.getElementById('stat-schema').innerText = stats.schema;
+
+                document.getElementById('welcome-msg').classList.add('hidden');
+                document.getElementById('stats-grid').classList.remove('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+
+                refreshLogs();
+            } catch (err) {
+                alert('Connection Failed: Check your API Key.');
+            }
+        }
+
+        async function refreshLogs() {
+            const res = await fetch('/api/admin/logs', {
+                headers: { 'Authorization': `Bearer ${currentApiKey}` }
+            });
+            const logs = await res.json();
+            const body = document.getElementById('logs-body');
+            body.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-white/5 transition text-sm';
+                row.innerHTML = `
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-bold ${getMethodClass(log.method)}">${log.method}</span></td>
+                    <td class="px-6 py-4 font-mono text-slate-300">${log.endpoint}</td>
+                    <td class="px-6 py-4"><span class="${log.status_code < 300 ? 'text-green-400' : 'text-red-400'}">${log.status_code}</span></td>
+                    <td class="px-6 py-4 text-slate-500">${new Date(log.timestamp).toLocaleTimeString()}</td>
+                `;
+                body.appendChild(row);
+            });
+        }
+
+        function getMethodClass(method) {
+            switch(method) {
+                case 'GET': return 'bg-blue-500/20 text-blue-400';
+                case 'POST': return 'bg-green-500/20 text-green-400';
+                case 'PATCH': return 'bg-yellow-500/20 text-yellow-400';
+                case 'DELETE': return 'bg-red-500/20 text-red-400';
+                default: return 'bg-slate-500/20 text-slate-400';
+            }
+        }
+    </script>
+</body>
+</html>

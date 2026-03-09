@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, User, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, User as UserIcon, ShoppingBag, Menu, X } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems, setIsOpen } = useCart();
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -50,8 +52,8 @@ const Navbar = () => {
           <button className="hover:opacity-60 transition-opacity">
             <Search size={18} strokeWidth={1.5} />
           </button>
-          <Link to="/auth" className="hover:opacity-60 transition-opacity">
-            <User size={18} strokeWidth={1.5} />
+          <Link to={user ? "/profile" : "/auth"} className="hover:opacity-60 transition-opacity">
+            <UserIcon size={18} strokeWidth={1.5} />
           </Link>
           <button className="relative hover:opacity-60 transition-opacity" onClick={() => setIsOpen(true)}>
             <ShoppingBag size={18} strokeWidth={1.5} />

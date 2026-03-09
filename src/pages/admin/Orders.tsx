@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/integrations/superbase';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,13 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, Eye, Printer, UserCheck } from 'lucide-react';
-import type { Tables } from '@/integrations/supabase/types';
+import { Search, Eye, Printer, UserCheck, Mail, MapPin, Package } from 'lucide-react';
 
-type Order = Tables<'orders'>;
-type OrderStatus = Order['status'];
-
-const statusColors: Record<OrderStatus, string> = {
+const statusColors: any = {
   pending: 'bg-yellow-100 text-yellow-800',
   processing: 'bg-blue-100 text-blue-800',
   hand_making: 'bg-purple-100 text-purple-800',
@@ -24,7 +20,7 @@ const statusColors: Record<OrderStatus, string> = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
-const statusLabels: Record<OrderStatus, string> = {
+const statusLabels: any = {
   pending: 'Pending',
   processing: 'Processing',
   hand_making: 'Hand-making',
@@ -35,43 +31,82 @@ const statusLabels: Record<OrderStatus, string> = {
 };
 
 const Orders = () => {
-  const { user, isAdmin } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<any[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = async () => {
-    const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-    if (data) setOrders(data);
-    setLoading(false);
+    try {
+      const data = await api.data.getAll('orders');
+      if (data) setOrders(data);
+    } catch (err) {
+      console.error('Fetch orders failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchOrders(); }, []);
 
-  const claimOrder = async (orderId: string) => {
-    if (!user) return;
-    const { error } = await supabase.from('orders').update({ claimed_by: user.id }).eq('id', orderId);
-    if (error) toast.error('Failed to claim order');
-    else { toast.success('Order claimed!'); fetchOrders(); }
+  const fetchOrderItems = async (orderId: string) => {
+    try {
+      const data = await api.data.getAll('order_items');
+      if (data) {
+        setOrderItems(data.filter((item: any) => item.order_id === orderId));
+      }
+    } catch (err) {
+      console.error('Fetch items failed:', err);
+    }
   };
 
-  const updateStatus = async (orderId: string, status: OrderStatus) => {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
-    if (error) toast.error('Failed to update status');
-    else { toast.success('Status updated'); fetchOrders(); setSelectedOrder(prev => prev ? { ...prev, status } : null); }
+  const handleOpenOrder = (order: any) => {
+    setSelectedOrder(order);
+    setTrackingNumber(order.tracking_number || '');
+    setInternalNotes(order.internal_notes || '');
+    setOrderItems([]);
+    fetchOrderItems(order.id);
+  };
+
+  const claimOrder = async (orderId: string) => {
+    if (!user) return;
+    try {
+      await api.data.update('orders', orderId, { claimed_by: user.email });
+      toast.success('Order claimed!'); 
+      fetchOrders();
+    } catch (err) {
+      toast.error('Failed to claim order');
+    }
+  };
+
+  const updateStatus = async (orderId: string, status: string) => {
+    try {
+      await api.data.update('orders', orderId, { status });
+      toast.success('Status updated'); 
+      fetchOrders(); 
+      setSelectedOrder((prev: any) => prev ? { ...prev, status } : null);
+    } catch (err) {
+      toast.error('Failed to update status');
+    }
   };
 
   const saveOrderDetails = async () => {
     if (!selectedOrder) return;
-    const { error } = await supabase.from('orders').update({
-      tracking_number: trackingNumber || null,
-      internal_notes: internalNotes || null,
-    }).eq('id', selectedOrder.id);
-    if (error) toast.error('Failed to save');
-    else { toast.success('Saved!'); fetchOrders(); }
+    try {
+      await api.data.update('orders', selectedOrder.id, {
+        tracking_number: trackingNumber || null,
+        internal_notes: internalNotes || null,
+      });
+      toast.success('Order tracking and notes updated!'); 
+      fetchOrders(); 
+      setSelectedOrder((prev: any) => prev ? { ...prev, tracking_number: trackingNumber, internal_notes: internalNotes } : null);
+    } catch (err) {
+      toast.error('Failed to save');
+    }
   };
 
   const filtered = orders.filter(o =>
@@ -135,11 +170,7 @@ const Orders = () => {
                         <UserCheck size={14} />
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      setSelectedOrder(order);
-                      setTrackingNumber(order.tracking_number || '');
-                      setInternalNotes(order.internal_notes || '');
-                    }}>
+                    <Button variant="ghost" size="sm" onClick={() => handleOpenOrder(order)}>
                       <Eye size={14} />
                     </Button>
                     <Button variant="ghost" size="sm" title="Print shipping label">
@@ -158,19 +189,26 @@ const Orders = () => {
       </div>
 
       {/* Order Detail Modal */}
-      <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="heading-display tracking-wider">
-              Order {selectedOrder?.order_number}
+            <DialogTitle className="heading-display tracking-wider flex items-center justify-between">
+              <span>Order {selectedOrder?.order_number}</span>
+              <a 
+                href={`mailto:${selectedOrder?.customer_email}?subject=Regarding your Precious Chic Nails Order ${selectedOrder?.order_number}`}
+                className="text-sm font-sans font-normal text-muted-foreground hover:text-foreground flex items-center gap-2 border px-3 py-1.5 rounded-lg mr-6"
+              >
+                <Mail size={14} />
+                Contact Customer
+              </a>
             </DialogTitle>
           </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm bg-accent/30 p-4 rounded-xl">
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Customer</p>
-                  <p>{selectedOrder.customer_name || 'N/A'}</p>
+                  <p className="font-medium">{selectedOrder.customer_name || 'N/A'}</p>
                   <p className="text-muted-foreground">{selectedOrder.customer_email}</p>
                 </div>
                 <div>
@@ -179,28 +217,80 @@ const Orders = () => {
                 </div>
               </div>
 
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Status</p>
-                <Select value={selectedOrder.status} onValueChange={(v) => updateStatus(selectedOrder.id, v as OrderStatus)}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(statusLabels).map(([val, label]) => (
-                      <SelectItem key={val} value={val}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Shipping Address */}
+              <div className="bg-card border border-border p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-3 text-sm font-medium">
+                  <MapPin size={16} className="text-muted-foreground" />
+                  <h3>Shipping Location</h3>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  {selectedOrder.shipping_address ? (
+                    <>
+                      <p>{(selectedOrder.shipping_address as any).addressLine1}</p>
+                      {(selectedOrder.shipping_address as any).addressLine2 && <p>{(selectedOrder.shipping_address as any).addressLine2}</p>}
+                      <p>{(selectedOrder.shipping_address as any).city}, {(selectedOrder.shipping_address as any).state} {(selectedOrder.shipping_address as any).postalCode}</p>
+                      <p>{(selectedOrder.shipping_address as any).country}</p>
+                    </>
+                  ) : (
+                    <p className="italic">No shipping address provided.</p>
+                  )}
+                </div>
               </div>
 
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Tracking Number</p>
-                <Input
-                  value={trackingNumber}
-                  onChange={e => setTrackingNumber(e.target.value)}
-                  placeholder="Enter tracking number..."
-                  className="rounded-xl"
-                />
+              {/* Order Items */}
+              <div className="bg-card border border-border p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-3 text-sm font-medium">
+                  <Package size={16} className="text-muted-foreground" />
+                  <h3>Products Bought</h3>
+                </div>
+                <div className="space-y-3">
+                  {orderItems.length > 0 ? (
+                    orderItems.map(item => (
+                      <div key={item.id} className="flex items-center gap-3 text-sm">
+                        {item.product_image ? (
+                          <img src={item.product_image} alt={item.product_name} className="w-12 h-12 object-cover rounded-md bg-muted" />
+                        ) : (
+                          <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center">
+                            <Package size={20} className="text-muted-foreground/50" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="font-medium">{item.product_name}</p>
+                          <p className="text-[11px] text-muted-foreground">Size: {item.size || 'Standard'} | Qty: {item.quantity}</p>
+                        </div>
+                        <p className="font-medium">${item.price}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Loading products...</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Order Status</p>
+                  <Select value={selectedOrder.status} onValueChange={(v) => updateStatus(selectedOrder.id, v as OrderStatus)}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(statusLabels).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Tracking Number</p>
+                  <Input
+                    value={trackingNumber}
+                    onChange={e => setTrackingNumber(e.target.value)}
+                    placeholder="e.g. 1Z9999999999999999"
+                    className="rounded-xl"
+                  />
+                </div>
               </div>
 
               <div>
@@ -215,7 +305,7 @@ const Orders = () => {
               </div>
 
               <Button onClick={saveOrderDetails} className="w-full btn-luxury">
-                Save Changes
+                Save Tracking & Details
               </Button>
             </div>
           )}

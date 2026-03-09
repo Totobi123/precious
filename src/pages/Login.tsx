@@ -24,7 +24,9 @@ const Login = () => {
       toast.error(error.message || 'Login failed');
     } else {
       toast.success('Welcome back!');
-      navigate('/admin');
+      // Check for custom admin route path in localStorage or site_settings
+      const adminPath = localStorage.getItem('admin_route_path') || 'admin';
+      navigate(`/${adminPath}`);
     }
   };
 
@@ -46,7 +48,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="admin@gmail.com"
+                placeholder="admin@preciousnails.com"
                 className="pl-10 rounded-xl"
                 required
               />

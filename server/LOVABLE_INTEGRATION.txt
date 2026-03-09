@@ -1,0 +1,61 @@
+# Superbase DBaaS Integration Guide for Lovable
+
+## 1. API Configuration
+- **Base URL:** http://localhost:7777
+- **Port:** 7777 (Live)
+
+## 2. Authentication Flow
+
+### Step A: Signup (Request OTP)
+**Endpoint:** `POST /auth/signup`
+**Payload:**
+```json
+{
+  "email": "user@example.com",
+  "password": "strongpassword"
+}
+```
+
+### Step B: Verify OTP
+**Endpoint:** `POST /auth/verify-otp`
+**Payload:**
+```json
+{
+  "email": "user@example.com",
+  "otp": "123456"
+}
+```
+
+### Step C: Login (Get API Key)
+**Endpoint:** `POST /auth/login`
+**Payload:**
+```json
+{
+  "email": "user@example.com",
+  "password": "strongpassword"
+}
+```
+**Response:** `{"api_key": "db_..."}`
+
+---
+
+## 3. Data API Usage
+Once logged in, use your `api_key` in the Authorization header:
+- **Header:** `Authorization: Bearer db_your_api_key_here`
+- **Insert Data:** `POST /v1/data/{table_name}`
+- **Fetch Data:** `GET /v1/data/{table_name}`
+
+---
+
+## 4. Prompt for Lovable (Copy & Paste this)
+"I have a FastAPI backend running at http://localhost:7777. Please create a authentication system with three screens: 
+1. A Signup screen that sends email and password to `/auth/signup`.
+2. An OTP Verification screen that sends the 6-digit code to `/auth/verify-otp`.
+3. A Login screen that sends credentials to `/auth/login` and stores the returned 'api_key' in local storage.
+Ensure all requests use JSON and handle the 'Authorization: Bearer {api_key}' header for subsequent data requests to `/v1/data/users_table`."
+
+---
+
+## 5. Server Status
+The server is currently RUNNING on port 7777.
+Logs are being stored in `server.log`.

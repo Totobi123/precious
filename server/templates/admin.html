@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superbase | Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .gradient-text { background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6, #6366f1); transition: all 0.3s ease; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl">
+        <div class="glass w-full max-w-md rounded-3xl p-8 space-y-6 text-center">
+            <div class="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/20">
+                <i class="fas fa-lock text-white text-2xl"></i>
+            </div>
+            <h2 class="text-3xl font-bold gradient-text">Admin Access</h2>
+            <p class="text-slate-400">Please enter the master administrative password to continue.</p>
+            <input id="admin-key" type="password" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 text-center outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••••••">
+            <button onclick="login()" class="w-full btn-primary py-4 rounded-xl font-bold text-lg">Authenticate</button>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center mb-6">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-shield-halved text-white"></i></div>
+            <h1 class="text-xl font-bold gradient-text uppercase tracking-widest">Superbase Admin</h1>
+        </div>
+        <div class="flex gap-4 items-center">
+            <span id="admin-status" class="text-xs text-green-400 bg-green-400/10 px-3 py-1 rounded-full border border-green-400/20 flex items-center gap-2">
+                <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Live System
+            </span>
+            <button onclick="location.reload()" class="text-slate-400 hover:text-white transition"><i class="fas fa-sync"></i></button>
+        </div>
+    </nav>
+
+    <div class="flex-1 px-6 pb-12 max-w-7xl mx-auto w-full grid grid-cols-12 gap-6">
+        <!-- Sidebar: Users -->
+        <div class="col-span-12 lg:col-span-3 space-y-6">
+            <div class="glass rounded-2xl p-6 h-[80vh] flex flex-col">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                    <i class="fas fa-users text-blue-400"></i> Users
+                </h2>
+                <div id="user-list" class="space-y-2 overflow-y-auto flex-1 pr-2">
+                    <!-- Users will be loaded here -->
+                    <div class="animate-pulse space-y-2">
+                        <div class="h-12 bg-slate-800 rounded-xl"></div>
+                        <div class="h-12 bg-slate-800 rounded-xl"></div>
+                        <div class="h-12 bg-slate-800 rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="col-span-12 lg:col-span-9 space-y-6">
+            <!-- Top Stats/Quick Actions -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass p-6 rounded-2xl border-l-4 border-blue-500">
+                    <p class="text-slate-400 text-sm">Active User</p>
+                    <h3 id="current-user-email" class="text-lg font-bold truncate">Select a user</h3>
+                </div>
+                <div class="glass p-6 rounded-2xl border-l-4 border-purple-500">
+                    <p class="text-slate-400 text-sm">Schema</p>
+                    <h3 id="current-user-schema" class="text-lg font-bold truncate">None</h3>
+                </div>
+                <div onclick="openMailer()" class="glass p-6 rounded-2xl border-l-4 border-emerald-500 cursor-pointer hover:bg-emerald-500/5 transition">
+                    <p class="text-slate-400 text-sm">Quick Action</p>
+                    <h3 class="text-lg font-bold"><i class="fas fa-paper-plane mr-2 text-emerald-400"></i> Open Mailer</h3>
+                </div>
+            </div>
+
+            <!-- Table Selection & Data Explorer -->
+            <div class="glass rounded-2xl overflow-hidden flex flex-col min-h-[60vh]">
+                <div class="p-6 border-b border-white/10 flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-bold">Data Explorer</h2>
+                        <select id="table-select" onchange="loadTableData()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Table</option>
+                        </select>
+                    </div>
+                    <div id="table-actions" class="hidden">
+                        <button onclick="refreshCurrentTable()" class="bg-slate-800 hover:bg-slate-700 px-4 py-1.5 rounded-lg text-sm transition flex items-center gap-2">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse">
+                        <thead id="data-thead" class="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <!-- Headers -->
+                        </thead>
+                        <tbody id="data-tbody" class="divide-y divide-white/5">
+                            <!-- Rows -->
+                            <tr>
+                                <td colspan="100" class="px-6 py-20 text-center text-slate-500">
+                                    <i class="fas fa-database text-4xl mb-4 block opacity-20"></i>
+                                    Select a user and a table to browse data
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mailer Modal -->
+    <div id="mailer-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="glass w-full max-w-lg rounded-3xl p-8 space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold gradient-text">Send Message</h2>
+                <button onclick="closeMailer()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">To Email</label>
+                    <input id="mail-to" type="email" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="user@example.com">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Subject</label>
+                    <input id="mail-subject" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tracking Update / Profile Notice">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Message Content</label>
+                    <textarea id="mail-body" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type your message here..."></textarea>
+                </div>
+                <button onclick="sendMail()" id="send-btn" class="w-full btn-primary py-4 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <i class="fas fa-paper-plane"></i> Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row Edit Modal -->
+    <div id="edit-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="glass w-full max-w-2xl rounded-3xl p-8 space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold gradient-text">Edit Record</h2>
+                <button onclick="closeEdit()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="edit-fields" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Fields will be generated here -->
+            </div>
+            <div class="flex gap-4">
+                <button onclick="saveEdit()" class="flex-1 btn-primary py-4 rounded-xl font-bold">Save Changes</button>
+                <button onclick="closeEdit()" class="px-8 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let users = [];
+        let selectedUserId = null;
+        let selectedTable = null;
+        let currentData = [];
+        let currentRow = null;
+        let adminKey = '';
+
+        async function login() {
+            adminKey = document.getElementById('admin-key').value;
+            try {
+                const res = await fetch('/api/admin/users', {
+                    headers: { 'Authorization': `Bearer ${adminKey}` }
+                });
+                if (res.ok) {
+                    document.getElementById('auth-modal').classList.add('hidden');
+                    loadUsers();
+                } else {
+                    alert('Invalid Admin Key');
+                }
+            } catch (err) {
+                alert('Connection Error');
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users', {
+                    headers: { 'Authorization': `Bearer ${adminKey}` }
+                });
+                users = await res.json();
+                const container = document.getElementById('user-list');
+                container.innerHTML = '';
+                
+                users.forEach(user => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 rounded-xl cursor-pointer hover:bg-white/5 transition border border-transparent flex items-center gap-3 group';
+                    div.onclick = () => selectUser(user);
+                    div.id = `user-${user.id}`;
+                    div.innerHTML = `
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg">
+                            ${user.email[0].toUpperCase()}
+                        </div>
+                        <div class="flex-1 truncate">
+                            <p class="text-sm font-medium truncate">${user.email}</p>
+                            <p class="text-[10px] text-slate-500 uppercase tracking-tighter">${user.schema}</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-600 group-hover:text-blue-400 transition text-xs"></i>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function selectUser(user) {
+            selectedUserId = user.id;
+            selectedTable = null;
+            
+            // UI Updates
+            document.querySelectorAll('#user-list > div').forEach(d => d.classList.remove('bg-blue-500/10', 'border-blue-500/30'));
+            document.getElementById(`user-${user.id}`).classList.add('bg-blue-500/10', 'border-blue-500/30');
+            
+            document.getElementById('current-user-email').innerText = user.email;
+            document.getElementById('current-user-schema').innerText = user.schema;
+            document.getElementById('mail-to').value = user.email;
+
+            // Load Tables
+            const res = await fetch(`/api/admin/user/${user.id}/tables`, {
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            });
+            const tables = await res.json();
+            const select = document.getElementById('table-select');
+            select.innerHTML = '<option value="">Select Table</option>';
+            tables.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.innerText = t;
+                select.appendChild(opt);
+            });
+
+            // Clear table data
+            document.getElementById('data-thead').innerHTML = '';
+            document.getElementById('data-tbody').innerHTML = `
+                <tr>
+                    <td colspan="100" class="px-6 py-20 text-center text-slate-500">
+                        <i class="fas fa-table text-4xl mb-4 block opacity-20"></i>
+                        Select a table to browse data for ${user.email}
+                    </td>
+                </tr>
+            `;
+            document.getElementById('table-actions').classList.add('hidden');
+        }
+
+        async function loadTableData() {
+            const table = document.getElementById('table-select').value;
+            if (!table) return;
+            selectedTable = table;
+            document.getElementById('table-actions').classList.remove('hidden');
+
+            const res = await fetch(`/api/admin/user/${selectedUserId}/data/${table}`, {
+                headers: { 'Authorization': `Bearer ${adminKey}` }
+            });
+            currentData = await res.json();
+            
+            renderTable();
+        }
+
+        function renderTable() {
+            const thead = document.getElementById('data-thead');
+            const tbody = document.getElementById('data-tbody');
+            
+            if (currentData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" class="px-6 py-20 text-center text-slate-500">No data found in this table</td></tr>';
+                return;
+            }
+
+            // Headers
+            const keys = Object.keys(currentData[0]);
+            thead.innerHTML = `<tr>${keys.map(k => `<th class="px-6 py-4">${k}</th>`).join('')}<th class="px-6 py-4">Actions</th></tr>`;
+
+            // Rows
+            tbody.innerHTML = '';
+            currentData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-white/5 transition text-sm group';
+                tr.innerHTML = `
+                    ${keys.map(k => `<td class="px-6 py-4 truncate max-w-[200px] text-slate-300 font-mono text-[13px]">${formatVal(row[k])}</td>`).join('')}
+                    <td class="px-6 py-4">
+                        <button onclick="editRow(${idx})" class="p-2 hover:bg-blue-500/20 text-blue-400 rounded-lg transition">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function formatVal(v) {
+            if (v === null) return '<span class="text-slate-600 italic">null</span>';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return v;
+        }
+
+        function refreshCurrentTable() {
+            loadTableData();
+        }
+
+        // MAILER
+        function openMailer() {
+            document.getElementById('mailer-modal').classList.remove('hidden');
+        }
+        function closeMailer() {
+            document.getElementById('mailer-modal').classList.add('hidden');
+        }
+
+        async function sendMail() {
+            const to = document.getElementById('mail-to').value;
+            const subject = document.getElementById('mail-subject').value;
+            const body = document.getElementById('mail-body').value;
+            const btn = document.getElementById('send-btn');
+
+            if (!to || !body) return alert('Email and Body are required');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> Sending...';
+
+            try {
+                const res = await fetch('/api/admin/send-mail', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminKey}`
+                    },
+                    body: JSON.stringify({ to, subject, body })
+                });
+                const data = await res.json();
+                alert(data.message || 'Email sent');
+                closeMailer();
+            } catch (err) {
+                alert('Error sending email');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Email';
+            }
+        }
+
+        // EDITING
+        function editRow(idx) {
+            currentRow = currentData[idx];
+            const container = document.getElementById('edit-fields');
+            container.innerHTML = '';
+
+            Object.keys(currentRow).forEach(key => {
+                if (key === 'id' || key === 'created_at') return; // Read only
+                
+                const div = document.createElement('div');
+                div.className = 'space-y-1';
+                div.innerHTML = `
+                    <label class="block text-xs text-slate-400 uppercase font-bold">${key}</label>
+                    <input type="text" data-key="${key}" value="${currentRow[key] || ''}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEdit() {
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        async function saveEdit() {
+            const payload = {};
+            document.querySelectorAll('#edit-fields input').forEach(input => {
+                payload[input.getAttribute('data-key')] = input.value;
+            });
+
+            try {
+                const res = await fetch(`/api/admin/user/${selectedUserId}/data/${selectedTable}/${currentRow.id}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminKey}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    alert('Updated successfully');
+                    closeEdit();
+                    loadTableData();
+                }
+            } catch (err) {
+                alert('Update failed');
+            }
+        }
+    </script>
+</body>
+</html>

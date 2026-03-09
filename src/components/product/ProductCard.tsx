@@ -28,20 +28,32 @@ const ProductCard = ({ product, onQuickView }: ProductCardProps) => {
         <div className="relative aspect-square overflow-hidden bg-secondary mb-3">
           {/* Primary image */}
           <img
-            src={product.image}
+            src={product.image || '/placeholder.svg'}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-              isHovered ? 'opacity-0' : 'opacity-100'
+              isHovered && product.hoverImage ? 'opacity-0' : 'opacity-100'
             }`}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder.svg';
+            }}
           />
           {/* Hover image */}
-          <img
-            src={product.hoverImage}
-            alt={product.name}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-              isHovered ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
+          {product.hoverImage && (
+            <img
+              src={product.hoverImage}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                isHovered ? 'opacity-100' : 'opacity-0'
+              }`}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          )}
 
           {/* Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-1">

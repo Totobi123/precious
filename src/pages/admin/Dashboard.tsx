@@ -24,32 +24,37 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [ordersRes, productsRes, profilesRes] = await Promise.all([
-        supabase.from('orders').select('total, created_at'),
-        supabase.from('products').select('stock_level').lt('stock_level', 5),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      ]);
+      try {
+        const [orders, products, adminUsers] = await Promise.all([
+          api.data.getAll('orders'),
+          api.data.getAll('products'),
+          api.admin.getUsers().catch(() => []), // fallback if not admin
+        ]);
 
-      const orders = ordersRes.data || [];
-      const revenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-      setStats({
-        totalRevenue: revenue,
-        totalOrders: orders.length,
-        newCustomers: profilesRes.count || 0,
-        lowStockAlerts: productsRes.data?.length || 0,
-      });
+        const revenue = (orders || []).reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+        const lowStock = (products || []).filter((p: any) => (p.stock_level || 0) < 5).length;
+        
+        setStats({
+          totalRevenue: revenue,
+          totalOrders: (orders || []).length,
+          newCustomers: (adminUsers || []).length,
+          lowStockAlerts: lowStock,
+        });
 
-      // Build real sales chart from orders
-      const last30 = Array.from({ length: 30 }, (_, i) => {
-        const date = subDays(new Date(), 29 - i);
-        const key = format(date, 'yyyy-MM-dd');
-        const label = format(date, 'MMM d');
-        const daySales = orders
-          .filter(o => o.created_at?.startsWith(key))
-          .reduce((sum, o) => sum + (o.total || 0), 0);
-        return { day: label, sales: daySales };
-      });
-      setSalesData(last30);
+        // Build real sales chart from orders
+        const last30 = Array.from({ length: 30 }, (_, i) => {
+          const date = subDays(new Date(), 29 - i);
+          const key = format(date, 'yyyy-MM-dd');
+          const label = format(date, 'MMM d');
+          const daySales = (orders || [])
+            .filter((o: any) => o.created_at?.startsWith(key))
+            .reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+          return { day: label, sales: daySales };
+        });
+        setSalesData(last30);
+      } catch (err) {
+        console.error('Stats fetch failed:', err);
+      }
     };
     fetchStats();
   }, []);

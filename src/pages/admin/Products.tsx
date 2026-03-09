@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/integrations/superbase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Search, Plus, Pencil, Trash2, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, Upload } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -18,11 +18,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-type Product = Tables<'products'>;
-
-const emptyProduct: Partial<TablesInsert<'products'>> = {
+const emptyProduct: any = {
   name: '',
   image: '',
   hover_image: '',
@@ -45,7 +42,7 @@ const lengths = ['Short', 'Medium', 'Long', 'Extra Long'];
 const categories = ['Press-On Nails', 'Gel Nails', 'Acrylic', 'Nail Art', 'Gift Sets', 'Accessories'];
 
 const Products = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,8 +51,6 @@ const Products = () => {
   const [form, setForm] = useState(emptyProduct);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [hoverImageFile, setHoverImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [hoverImagePreview, setHoverImagePreview] = useState<string | null>(null);
   
@@ -63,9 +58,14 @@ const Products = () => {
   const hoverImageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (data) setProducts(data);
-    setLoading(false);
+    try {
+      const data = await api.data.getAll('products');
+      if (data) setProducts(data);
+    } catch (err) {
+      console.error('Fetch failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchProducts(); }, []);
@@ -76,34 +76,14 @@ const Products = () => {
   const openCreate = () => {
     setForm(emptyProduct);
     setEditingId(null);
-    setImageFile(null);
-    setHoverImageFile(null);
     setImagePreview(null);
     setHoverImagePreview(null);
     setModalOpen(true);
   };
 
-  const openEdit = (p: Product) => {
-    setForm({
-      name: p.name,
-      image: p.image,
-      hover_image: p.hover_image || '',
-      shape: p.shape,
-      length: p.length,
-      color: p.color,
-      price: p.price,
-      compare_price: p.compare_price,
-      description: p.description || '',
-      category: p.category || '',
-      slug: p.slug,
-      stock_level: p.stock_level ?? 0,
-      is_active: p.is_active ?? true,
-      is_new: p.is_new ?? false,
-      is_bestseller: p.is_bestseller ?? false,
-    });
+  const openEdit = (p: any) => {
+    setForm({ ...p });
     setEditingId(p.id);
-    setImageFile(null);
-    setHoverImageFile(null);
     setImagePreview(p.image);
     setHoverImagePreview(p.hover_image || null);
     setModalOpen(true);
@@ -117,25 +97,22 @@ const Products = () => {
 
     setSaving(true);
     try {
-      // Use the Base64 preview if a new file was selected, otherwise use the existing URL/string
       const imageUrl = imagePreview || form.image;
       const hoverImageUrl = hoverImagePreview || form.hover_image;
-
       const slug = form.slug || generateSlug(form.name || '');
+      
       const payload = { 
         ...form, 
         slug, 
         image: imageUrl, 
         hover_image: hoverImageUrl 
-      } as TablesInsert<'products'>;
+      };
 
       if (editingId) {
-        const { error } = await supabase.from('products').update(payload).eq('id', editingId);
-        if (error) throw error;
+        await api.data.update('products', editingId, payload);
         toast.success('Product updated!');
       } else {
-        const { error } = await supabase.from('products').insert(payload);
-        if (error) throw error;
+        await api.data.create('products', payload);
         toast.success('Product created!');
       }
       
@@ -160,10 +137,8 @@ const Products = () => {
     const reader = new FileReader();
     reader.onloadend = () => {
       if (type === 'main') {
-        setImageFile(file);
         setImagePreview(reader.result as string);
       } else {
-        setHoverImageFile(file);
         setHoverImagePreview(reader.result as string);
       }
     };
@@ -172,16 +147,24 @@ const Products = () => {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    const { error } = await supabase.from('products').delete().eq('id', deleteId);
-    if (error) toast.error('Failed to delete: ' + error.message);
-    else { toast.success('Product deleted'); fetchProducts(); }
+    try {
+      await api.data.delete('products', deleteId);
+      toast.success('Product deleted'); 
+      fetchProducts();
+    } catch (err: any) {
+      toast.error('Failed to delete: ' + err.message);
+    }
     setDeleteId(null);
   };
 
   const updateStock = async (id: string, stock: number) => {
-    const { error } = await supabase.from('products').update({ stock_level: stock }).eq('id', id);
-    if (error) toast.error('Failed to update stock');
-    else { toast.success('Stock updated'); fetchProducts(); }
+    try {
+      await api.data.update('products', id, { stock_level: stock });
+      toast.success('Stock updated'); 
+      fetchProducts();
+    } catch (err: any) {
+      toast.error('Failed to update stock');
+    }
   };
 
   const filtered = products.filter(p =>
@@ -190,7 +173,7 @@ const Products = () => {
     p.shape.toLowerCase().includes(search.toLowerCase())
   );
 
-  const setField = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+  const setField = (key: string, value: any) => setForm((prev: any) => ({ ...prev, [key]: value }));
 
   return (
     <div className="p-6 lg:p-8">
@@ -281,7 +264,6 @@ const Products = () => {
         )}
       </div>
 
-      {/* Create / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -345,7 +327,7 @@ const Products = () => {
                   <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border bg-muted">
                     <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
                     <button 
-                      onClick={() => { setImageFile(null); setImagePreview(null); setField('image', ''); }}
+                      onClick={() => { setImagePreview(null); setField('image', ''); }}
                       className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
                     >
                       <X size={14} />
@@ -380,7 +362,6 @@ const Products = () => {
                   onChange={e => {
                     setField('image', e.target.value);
                     setImagePreview(e.target.value);
-                    setImageFile(null);
                   }} 
                   placeholder="https://example.com/image.jpg" 
                 />
@@ -394,7 +375,7 @@ const Products = () => {
                   <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border bg-muted">
                     <img src={hoverImagePreview} className="w-full h-full object-cover" alt="Hover Preview" />
                     <button 
-                      onClick={() => { setHoverImageFile(null); setHoverImagePreview(null); setField('hover_image', ''); }}
+                      onClick={() => { setHoverImagePreview(null); setField('hover_image', ''); }}
                       className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
                     >
                       <X size={14} />
@@ -429,7 +410,6 @@ const Products = () => {
                   onChange={e => {
                     setField('hover_image', e.target.value);
                     setHoverImagePreview(e.target.value);
-                    setHoverImageFile(null);
                   }} 
                   placeholder="https://example.com/hover.jpg" 
                 />
@@ -475,7 +455,6 @@ const Products = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

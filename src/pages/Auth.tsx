@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,8 +8,6 @@ import { toast } from 'sonner';
 import { Mail, Lock, KeyRound, ArrowLeft, Sparkles, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-proxy`;
 
 type AuthStep = 'login' | 'signup' | 'otp';
 
@@ -21,6 +20,7 @@ const Auth = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { signIn, signUp, verifyOtp } = useAuth();
 
   const clearError = () => setError('');
 
@@ -38,24 +38,14 @@ const Auth = () => {
     setIsLoading(true);
     clearError();
 
-    try {
-      const res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: '/auth/signup', body: { email: email.trim(), password: password.trim() } }),
-      });
+    const { error } = await signUp(email.trim(), password.trim());
+    setIsLoading(false);
 
-      if (res.ok) {
-        toast.success('Please check your email for the verification code.');
-        setStep('otp');
-      } else {
-        const data = await res.json().catch(() => null);
-        setError(data?.detail || data?.message || data?.error || `Signup failed (${res.status}). Please try again.`);
-      }
-    } catch {
-      setError('Network error. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
+    if (!error) {
+      toast.success('Please check your email for the verification code. (Check SPAM folder)');
+      setStep('otp');
+    } else {
+      setError(error.message || 'Signup failed. Please try again.');
     }
   };
 
@@ -69,26 +59,16 @@ const Auth = () => {
     setIsLoading(true);
     clearError();
 
-    try {
-      const res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: '/auth/verify-otp', body: { email: email.trim(), otp } }),
-      });
+    const { error } = await verifyOtp(email.trim(), otp);
+    setIsLoading(false);
 
-      if (res.ok) {
-        toast.success('Email verified! You can now sign in.');
-        setPassword('');
-        setOtp('');
-        setStep('login');
-      } else {
-        const data = await res.json().catch(() => null);
-        setError(data?.detail || data?.message || data?.error || 'Invalid verification code. Please try again.');
-      }
-    } catch {
-      setError('Network error. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
+    if (!error) {
+      toast.success('Email verified! You can now sign in.');
+      setPassword('');
+      setOtp('');
+      setStep('login');
+    } else {
+      setError(error.message || 'Invalid verification code. Please try again.');
     }
   };
 
@@ -102,28 +82,14 @@ const Auth = () => {
     setIsLoading(true);
     clearError();
 
-    try {
-      const res = await fetch(PROXY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: '/auth/login', body: { email: email.trim(), password: password.trim() } }),
-      });
+    const { error } = await signIn(email.trim(), password.trim());
+    setIsLoading(false);
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.api_key) {
-          localStorage.setItem('superbase_api_key', data.api_key);
-        }
-        toast.success('Welcome back!');
-        navigate('/');
-      } else {
-        const data = await res.json().catch(() => null);
-        setError(data?.detail || data?.message || data?.error || 'Invalid email or password.');
-      }
-    } catch {
-      setError('Network error. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
+    if (!error) {
+      toast.success('Welcome back!');
+      navigate('/');
+    } else {
+      setError(error.message || 'Invalid email or password.');
     }
   };
 

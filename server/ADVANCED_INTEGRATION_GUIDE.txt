@@ -1,0 +1,62 @@
+# Advanced Superbase DBaaS Integration & Admin Guide
+
+## 1. New Enterprise Features
+Your backend now includes a "Global Admin Engine" which allows you to:
+- **Dynamic Email Switching**: Switch between your 8 provided email accounts (support@jabooks.shop, ceo@genxflow.shop, etc.) without touching the code.
+- **Brand Spoofing**: Change the "From Name" (e.g., from "GenxFlow" to "My Store Name") instantly.
+- **Custom OTP Templates**: Edit the text sent to users, including the "Check Spam" instructions.
+- **Universal Storage**: Automatically handles Products, Orders, and User Details via the `/v1/data/` endpoint.
+
+---
+
+## 2. API Endpoints for Integration
+
+### Admin Management
+- **View Settings**: `GET /api/admin/settings` (See active email and current template).
+- **Update Settings**: `POST /api/admin/settings`
+  *Payload Example:*
+  ```json
+  {
+    "active_smtp_user": "support@jabooks.shop",
+    "from_name": "James Books Support",
+    "otp_subject": "Your Security Code",
+    "otp_body_template": "Your OTP is {otp}. Check your SPAM folder if you don't see it!",
+    "smtp_host": "mail.privateemail.com"
+  }
+  ```
+
+### Universal Data Storage (Products, Orders, Users)
+- **Save Anything**: `POST /v1/data/{table_name}`
+  *Example for Products:* `POST /v1/data/products`
+  *Example for Orders:* `POST /v1/data/orders`
+- **Retrieve Anything**: `GET /v1/data/{table_name}`
+
+---
+
+## 3. Master Prompt for AI Agents (Lovable / Cursor / ChatGPT)
+**Copy and paste the text below into your AI builder to generate your site:**
+
+"I have a FastAPI backend at http://localhost:7777. Please build a full e-commerce system with an Admin Panel:
+
+1. **Storefront**: Build a Product listing page and a Checkout system. 
+   - Save products to `POST /v1/data/products`.
+   - Save orders to `POST /v1/data/orders`.
+   - All data requests must include `Authorization: Bearer {api_key}`.
+
+2. **Auth System**:
+   - Signup (`/auth/signup`), OTP Verify (`/auth/verify-otp`), and Login (`/auth/login`).
+   - Store the `api_key` in LocalStorage for all data requests.
+
+3. **Admin Panel**: Build a 'Settings' page for me to manage the backend.
+   - It should fetch current settings from `GET /api/admin/settings`.
+   - It should allow me to update the 'From Name', 'Active Email', and 'Email Body Template' via `POST /api/admin/settings`.
+   - Provide a dropdown for these 8 emails: support@jabooks.shop, james@jabooks.shop, admin@jabooks.shop, ceo@genxflow.shop, ceo@genxflow.site, ceo@nexus-media-group.xyz, ceo@genxleads.online, ceo@genxleads.shop.
+
+Ensure all UI is modern, responsive, and handles the OTP 'Check Spam' messaging clearly."
+
+---
+
+## 4. Current Server Status
+- **Port**: 7777 (Live)
+- **Active Mail**: Configured via Database (Default: ceo@genxflow.shop)
+- **Password for all Mails**: Titobilove123@
