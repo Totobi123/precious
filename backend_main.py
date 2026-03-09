@@ -369,24 +369,29 @@ async def insert_data(table_name: str, payload: Dict[str, Any], authorization: s
     user = (await db.execute(text("SELECT schema_name FROM public.users WHERE api_key = :key"), {"key": api_key})).fetchone()
     if not user: raise HTTPException(status_code=401)
     
+    # Pre-process payload to ensure it's clean
+    clean_payload = {}
+    for k, v in payload.items():
+        if k == "id" or k == "created_at": continue
+        clean_payload[k] = v
+
     # Auto-generate table if it doesn't exist
     cols = []
-    for k, v in payload.items():
+    for k, v in clean_payload.items():
         t = "TEXT"
         if isinstance(v, int): t = "INTEGER"
         elif isinstance(v, float): t = "FLOAT"
         elif isinstance(v, bool): t = "BOOLEAN"
-        elif isinstance(v, (dict, list)): t = "JSONB"
+        elif isinstance(v, (dict, list)): 
+            t = "JSONB"
+            clean_payload[k] = json.dumps(v)
         cols.append(f"\"{k}\" {t}")
-        
-        # Serialize dict/list for asyncpg raw query execution
-        if isinstance(v, (dict, list)):
-            payload[k] = json.dumps(v)
     
     await db.execute(text(f"CREATE TABLE IF NOT EXISTS {user.schema_name}.\"{table_name}\" (id SERIAL PRIMARY KEY, {', '.join(cols)}, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"))
     
-    keys, ph = [f"\"{k}\"" for k in payload.keys()], [f":{k}" for k in payload.keys()]
-    res = await db.execute(text(f"INSERT INTO {user.schema_name}.\"{table_name}\" ({', '.join(keys)}) VALUES ({', '.join(ph)}) RETURNING id"), payload)
+    keys, ph = [f"\"{k}\"" for k in clean_payload.keys()], [f":{k}" for k in clean_payload.keys()]
+    query = f"INSERT INTO {user.schema_name}.\"{table_name}\" ({', '.join(keys)}) VALUES ({', '.join(ph)}) RETURNING id"
+    res = await db.execute(text(query), clean_payload)
     await db.commit()
     return {"id": res.fetchone()[0], "message": f"Data saved to {table_name}"}
 

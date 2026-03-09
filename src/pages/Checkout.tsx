@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Package } from 'lucide-react';
+import { api } from '@/integrations/superbase';
 
 const Checkout = () => {
   const { items, subtotal, clearCart, amountUntilFreeShipping } = useCart();
@@ -39,7 +39,9 @@ const Checkout = () => {
 
     try {
       // 1. Create Order
+      const orderNumber = `PRN-${Math.floor(Math.random() * 900000) + 100000}`;
       const orderData = await api.data.create('orders', {
+        order_number: orderNumber,
         customer_email: form.email,
         customer_name: form.name,
         subtotal: subtotal,
@@ -57,11 +59,16 @@ const Checkout = () => {
 
       // 2. Create Order Items
       for (const item of items) {
+        // Ensure image is not a massive base64 string if possible
+        const imageUrl = typeof item.product.image === 'string' && item.product.image.startsWith('data:') 
+          ? 'placeholder.svg' 
+          : item.product.image;
+
         await api.data.create('order_items', {
           order_id: orderData.id,
           product_id: item.product.id,
           product_name: item.product.name,
-          product_image: item.product.image,
+          product_image: imageUrl,
           quantity: item.quantity,
           size: item.size,
           price: item.product.price
@@ -69,7 +76,7 @@ const Checkout = () => {
       }
 
       // Success
-      toast.success('Order placed successfully! Check your email for details.');
+      toast.success('Order placed successfully!');
       clearCart();
       if (user) {
         navigate('/profile');
